@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Using pnpm — npm/yarn lockfiles are noise
+package-lock.json
+yarn.lock
+
+# Claude Code private settings (not source code)
+.claude/
+
+# Vercel local cache
+.vercel/
