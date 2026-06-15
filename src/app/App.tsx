@@ -11,7 +11,7 @@ import type { Task } from "./components/types";
 type Tab = "tasks" | "dashboard" | "reminders";
 
 export default function App() {
-  const { tasks, addTask, updateTask, deleteTask, toggleToday, toggleDate, incrementCount, decrementCount, today, groups } = useTasks();
+  const { tasks, addTask, updateTask, deleteTask, toggleToday, toggleDate, incrementCount, decrementCount, today, groups, exportJSON, importJSON, exportCSV, storageError } = useTasks();
   const [tab, setTab] = useState<Tab>("tasks");
   const [showAdd, setShowAdd] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
@@ -98,6 +98,10 @@ export default function App() {
                 const t = tasks.find(t => t.id === id);
                 if (t?.reminder) updateTask(id, { reminder: { ...t.reminder, time, label } });
               }}
+              onExportJSON={exportJSON}
+              onExportCSV={exportCSV}
+              onImportJSON={importJSON}
+              storageError={storageError}
             />
           )}
         </main>

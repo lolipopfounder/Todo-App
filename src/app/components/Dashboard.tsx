@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { TrendingUp, Award, Zap, Target, ChevronLeft, ChevronRight, CheckCircle2, Circle, X } from "lucide-react";
 import type { Task, DayRecord } from "./types";
@@ -377,12 +377,18 @@ export function Dashboard({ tasks, history, today, onToggleDate }: Props) {
 
         {selectedTask ? (
           <ResponsiveContainer width="100%" height={130}>
-            <BarChart data={taskSeries} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+            <AreaChart data={taskSeries} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="taskGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={selectedTask.color} stopOpacity={0.2} />
+                  <stop offset="95%" stopColor={selectedTask.color} stopOpacity={0} />
+                </linearGradient>
+              </defs>
               <XAxis dataKey="dateLabel" tick={{ fontFamily: "'Inter', sans-serif", fontSize: 10, fill: "#8e8e93" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontFamily: "'Inter', sans-serif", fontSize: 10, fill: "#8e8e93" }} axisLine={false} tickLine={false} allowDecimals={false} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="count" name={selectedTask.title} radius={[4, 4, 0, 0]} fill={selectedTask.color} />
-            </BarChart>
+              <Area type="monotone" dataKey="count" name={selectedTask.title} stroke={selectedTask.color} strokeWidth={2} fill="url(#taskGrad)" dot={false} />
+            </AreaChart>
           </ResponsiveContainer>
         ) : (
           <ResponsiveContainer width="100%" height={130}>
@@ -408,16 +414,18 @@ export function Dashboard({ tasks, history, today, onToggleDate }: Props) {
           Tasks Done Per Day
         </p>
         <ResponsiveContainer width="100%" height={100}>
-          <BarChart data={last14} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+          <AreaChart data={last14} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+            <defs>
+              <linearGradient id="doneGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+              </linearGradient>
+            </defs>
             <XAxis dataKey="dateLabel" tick={{ fontFamily: "'Inter', sans-serif", fontSize: 10, fill: "#8e8e93" }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontFamily: "'Inter', sans-serif", fontSize: 10, fill: "#8e8e93" }} axisLine={false} tickLine={false} allowDecimals={false} />
             <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="completed" name="done" radius={[4, 4, 0, 0]}>
-              {last14.map((entry, i) => (
-                <Cell key={i} fill={entry.date === today ? "#3b82f6" : "#bfdbfe"} />
-              ))}
-            </Bar>
-          </BarChart>
+            <Area type="monotone" dataKey="completed" name="done" stroke="#3b82f6" strokeWidth={2} fill="url(#doneGrad)" dot={false} />
+          </AreaChart>
         </ResponsiveContainer>
       </div>
 

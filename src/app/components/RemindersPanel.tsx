@@ -1,13 +1,28 @@
-import { Bell, BellOff, Clock } from "lucide-react";
+import { useRef, useState } from "react";
+import { Bell, BellOff, Download, Upload } from "lucide-react";
 import type { Task } from "./types";
 
 interface Props {
   tasks: Task[];
   onToggleReminder: (taskId: string) => void;
   onUpdateReminder: (taskId: string, time: string, label: string) => void;
+  onExportJSON: () => void;
+  onExportCSV: () => void;
+  onImportJSON: (file: File) => Promise<{ ok: boolean; message: string }>;
+  storageError?: string | null;
 }
 
-export function RemindersPanel({ tasks, onToggleReminder, onUpdateReminder }: Props) {
+export function RemindersPanel({ tasks, onToggleReminder, onUpdateReminder, onExportJSON, onExportCSV, onImportJSON, storageError }: Props) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [status, setStatus] = useState<{ ok: boolean; message: string } | null>(null);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-importing the same file
+    if (!file) return;
+    setStatus(await onImportJSON(file));
+  }
+
   const withReminders = tasks.filter(t => t.reminder);
   const active = withReminders.filter(t => t.reminder?.enabled);
 
@@ -108,6 +123,54 @@ export function RemindersPanel({ tasks, onToggleReminder, onUpdateReminder }: Pr
         <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "12px", color: "#3b82f6", lineHeight: 1.6 }}>
           💡 Reminders are saved locally. Browser push notifications coming soon.
         </p>
+      </div>
+
+      {/* Data & Backup */}
+      <div className="rounded-2xl p-4 mt-2" style={{ background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+        <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "15px", fontWeight: 700, color: "#1c1c1e" }}>
+          Data &amp; Backup
+        </p>
+        <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "12px", color: "#8e8e93", marginTop: "2px", lineHeight: 1.5 }}>
+          Your data lives only in this browser. Export a backup regularly so you don't lose it.
+        </p>
+
+        <div className="flex items-center gap-2 mt-3">
+          <button
+            onClick={onExportJSON}
+            className="flex items-center justify-center gap-1.5 flex-1 transition-all active:scale-95"
+            style={{ background: "#3b82f6", color: "#fff", borderRadius: "10px", padding: "9px 12px", fontFamily: "'Inter', sans-serif", fontSize: "14px", fontWeight: 600 }}
+          >
+            <Download size={16} /> Export
+          </button>
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="flex items-center justify-center gap-1.5 flex-1 transition-all active:scale-95"
+            style={{ background: "#f2f2f7", color: "#1c1c1e", borderRadius: "10px", padding: "9px 12px", fontFamily: "'Inter', sans-serif", fontSize: "14px", fontWeight: 600 }}
+          >
+            <Upload size={16} /> Import
+          </button>
+        </div>
+
+        <button
+          onClick={onExportCSV}
+          className="mt-2 transition-all active:scale-95"
+          style={{ fontFamily: "'Inter', sans-serif", fontSize: "12px", color: "#8e8e93", textDecoration: "underline" }}
+        >
+          Export CSV (for spreadsheets — can't be re-imported)
+        </button>
+
+        <input ref={fileRef} type="file" accept="application/json" onChange={handleFile} style={{ display: "none" }} />
+
+        {status && (
+          <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "12px", marginTop: "10px", color: status.ok ? "#10b981" : "#ef4444" }}>
+            {status.message}
+          </p>
+        )}
+        {storageError && (
+          <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "12px", marginTop: "8px", color: "#ef4444", lineHeight: 1.5 }}>
+            ⚠️ {storageError}
+          </p>
+        )}
       </div>
 
       <div className="h-4" />

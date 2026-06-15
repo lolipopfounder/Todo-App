@@ -1,7 +1,30 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Task, DayRecord } from "./types";
 
 const STORAGE_KEY = "taskflow_tasks_v2";
+
+/** Minimal shape check so a bad import/blob can't replace tasks with garbage. */
+function isTaskLike(t: unknown): t is Task {
+  return (
+    !!t &&
+    typeof t === "object" &&
+    typeof (t as Task).id === "string" &&
+    typeof (t as Task).title === "string" &&
+    Array.isArray((t as Task).completedDates)
+  );
+}
+
+function triggerDownload(filename: string, content: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 const COLORS = [
   "#3b82f6", "#10b981", "#8b5cf6", "#f59e0b",
@@ -123,29 +146,57 @@ const SEED_TASKS: Task[] = [
   },
 ];
 
+// Migrate pre-v2.1 tasks: single `count` -> per-day `dailyCounts`.
+function migrate(parsed: (Task & { count?: number })[], todayStr: string): Task[] {
+  return parsed.map(t => {
+    if (t.dailyCounts) {
+      const { count: _drop, ...rest } = t;
+      return rest as Task;
+    }
+    const { count = 0, ...rest } = t;
+    return { ...rest, dailyCounts: count ? { [todayStr]: count } : {} } as Task;
+  });
+}
+
 export function useTasks() {
+  // Distinguishes "no data yet" (use seed) from "data present but unparseable"
+  // (keep seed for display, but don't overwrite the recoverable blob).
+  const loadFailedRef = useRef(false);
   const [tasks, setTasks] = useState<Task[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) return SEED_TASKS;
-      const parsed = JSON.parse(stored) as (Task & { count?: number })[];
-      const todayStr = today();
-      // Migrate pre-v2.1 tasks: single `count` -> per-day `dailyCounts`.
-      return parsed.map(t => {
-        if (t.dailyCounts) {
-          const { count: _drop, ...rest } = t;
-          return rest as Task;
-        }
-        const { count = 0, ...rest } = t;
-        return { ...rest, dailyCounts: count ? { [todayStr]: count } : {} } as Task;
-      });
+      if (stored == null) return SEED_TASKS;
+      const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed)) {
+        loadFailedRef.current = true;
+        return SEED_TASKS;
+      }
+      return migrate(parsed, today());
     } catch {
+      loadFailedRef.current = true;
       return SEED_TASKS;
     }
   });
 
+  const [storageError, setStorageError] = useState<string | null>(
+    loadFailedRef.current ? "Saved data couldn't be read. It's been preserved — export a backup before making changes." : null,
+  );
+
+  // Skip the first run so simply mounting (with seed/fallback data) never
+  // clobbers stored data — only an actual change is persisted.
+  const firstRun = useRef(true);
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+      setStorageError(null);
+    } catch (e) {
+      console.warn("taskflow: failed to persist tasks", e);
+      setStorageError("Couldn't save — storage may be full or unavailable. Export a backup.");
+    }
   }, [tasks]);
 
   const todayStr = today();
@@ -218,9 +269,42 @@ export function useTasks() {
     }));
   }
 
+  // Restore-capable backup: JSON round-trips the nested model losslessly.
+  function exportJSON() {
+    triggerDownload(
+      `taskflow-backup-${todayStr}.json`,
+      JSON.stringify(tasks, null, 2),
+      "application/json",
+    );
+  }
+
+  async function importJSON(file: File): Promise<{ ok: boolean; message: string }> {
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (!Array.isArray(parsed) || !parsed.every(isTaskLike)) {
+        return { ok: false, message: "That file isn't a valid TaskFlow backup." };
+      }
+      setTasks(migrate(parsed as (Task & { count?: number })[], todayStr));
+      return { ok: true, message: `Imported ${parsed.length} task${parsed.length !== 1 ? "s" : ""}.` };
+    } catch {
+      return { ok: false, message: "Couldn't read that file — is it valid JSON?" };
+    }
+  }
+
+  // Spreadsheet-friendly, flat, and LOSSY — for viewing only, not restore.
+  function exportCSV() {
+    const cols = ["id", "title", "description", "priority", "group", "emoji", "isCountable", "goal", "sets", "totalCompletions", "createdAt", "completedDates"] as const;
+    const esc = (v: unknown) => {
+      const s = v == null ? "" : Array.isArray(v) ? v.join("|") : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = tasks.map(t => cols.map(c => esc((t as Record<string, unknown>)[c])).join(","));
+    triggerDownload(`taskflow-export-${todayStr}.csv`, [cols.join(","), ...rows].join("\n"), "text/csv");
+  }
+
   const groups = Array.from(new Set(tasks.map(t => t.group))).filter(Boolean);
 
-  return { tasks, addTask, updateTask, deleteTask, toggleToday, toggleDate, incrementCount, decrementCount, today: todayStr, COLORS, groups };
+  return { tasks, addTask, updateTask, deleteTask, toggleToday, toggleDate, incrementCount, decrementCount, today: todayStr, COLORS, groups, exportJSON, importJSON, exportCSV, storageError };
 }
 
 // Sets (or raw units) logged for a task on a given day.
