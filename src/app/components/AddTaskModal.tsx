@@ -20,6 +20,7 @@ export function AddTaskModal({ open, groups, onClose, onAdd }: Props) {
   const [emoji, setEmoji] = useState("📋");
   const [isCountable, setIsCountable] = useState(false);
   const [goal, setGoal] = useState("");
+  const [sets, setSets] = useState("");
   const [hasReminder, setHasReminder] = useState(false);
   const [reminderTime, setReminderTime] = useState("09:00");
   const [reminderLabel, setReminderLabel] = useState("");
@@ -38,8 +39,8 @@ export function AddTaskModal({ open, groups, onClose, onAdd }: Props) {
       group: finalGroup.toUpperCase(),
       emoji,
       isCountable,
-      count: 0,
       goal: isCountable && goal ? Number(goal) : undefined,
+      sets: isCountable && sets ? Number(sets) : undefined,
       reminder: hasReminder
         ? { id: Date.now().toString(), time: reminderTime, label: reminderLabel || title, enabled: true }
         : undefined,
@@ -47,7 +48,7 @@ export function AddTaskModal({ open, groups, onClose, onAdd }: Props) {
     // Reset
     setTitle(""); setDescription(""); setPriority("medium");
     setGroup(groups[0] || ""); setCustomGroup(""); setEmoji("📋");
-    setIsCountable(false); setGoal(""); setHasReminder(false);
+    setIsCountable(false); setGoal(""); setSets(""); setHasReminder(false);
     setReminderTime("09:00"); setReminderLabel("");
     onClose();
   }
@@ -229,16 +230,29 @@ export function AddTaskModal({ open, groups, onClose, onAdd }: Props) {
               </button>
             </div>
             {isCountable && (
-              <div className="mt-3">
-                <span style={labelStyle}>Goal (target count)</span>
-                <input
-                  type="number"
-                  min="1"
-                  value={goal}
-                  onChange={e => setGoal(e.target.value)}
-                  placeholder="e.g. 20"
-                  style={inputStyle}
-                />
+              <div className="mt-3 flex flex-col gap-3">
+                <div>
+                  <span style={labelStyle}>{sets ? "Reps per set" : "Goal (target count)"}</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={goal}
+                    onChange={e => setGoal(e.target.value)}
+                    placeholder="e.g. 20"
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <span style={labelStyle}>Sets (number of sets)</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={sets}
+                    onChange={e => setSets(e.target.value)}
+                    placeholder="Optional — e.g. 3"
+                    style={inputStyle}
+                  />
+                </div>
               </div>
             )}
           </div>

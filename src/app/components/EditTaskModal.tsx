@@ -23,6 +23,7 @@ export function EditTaskModal({ task, groups, onClose, onSave, onDelete }: Props
   const [emoji, setEmoji] = useState(task?.emoji ?? "📋");
   const [isCountable, setIsCountable] = useState(task?.isCountable ?? false);
   const [goal, setGoal] = useState(task?.goal?.toString() ?? "");
+  const [sets, setSets] = useState(task?.sets?.toString() ?? "");
   const [hasReminder, setHasReminder] = useState(!!task?.reminder);
   const [reminderTime, setReminderTime] = useState(task?.reminder?.time ?? "09:00");
   const [reminderLabel, setReminderLabel] = useState(task?.reminder?.label ?? "");
@@ -42,6 +43,7 @@ export function EditTaskModal({ task, groups, onClose, onSave, onDelete }: Props
       emoji,
       isCountable,
       goal: isCountable && goal ? Number(goal) : undefined,
+      sets: isCountable && sets ? Number(sets) : undefined,
       reminder: hasReminder
         ? {
             id: task!.reminder?.id ?? Date.now().toString(),
@@ -240,16 +242,29 @@ export function EditTaskModal({ task, groups, onClose, onSave, onDelete }: Props
               </button>
             </div>
             {isCountable && (
-              <div className="mt-3">
-                <span style={labelStyle}>Goal (target count)</span>
-                <input
-                  type="number"
-                  min="1"
-                  value={goal}
-                  onChange={e => setGoal(e.target.value)}
-                  placeholder="e.g. 20"
-                  style={inputStyle}
-                />
+              <div className="mt-3 flex flex-col gap-3">
+                <div>
+                  <span style={labelStyle}>{sets ? "Reps per set" : "Goal (target count)"}</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={goal}
+                    onChange={e => setGoal(e.target.value)}
+                    placeholder="e.g. 20"
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <span style={labelStyle}>Sets (number of sets)</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={sets}
+                    onChange={e => setSets(e.target.value)}
+                    placeholder="Optional — e.g. 3"
+                    style={inputStyle}
+                  />
+                </div>
               </div>
             )}
           </div>

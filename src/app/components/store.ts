@@ -21,8 +21,8 @@ const SEED_TASKS: Task[] = [
     group: "WORK",
     emoji: "💼",
     isCountable: true,
-    count: 0,
     goal: 20,
+    dailyCounts: { "2026-06-12": 8, "2026-06-13": 12, "2026-06-14": 5 },
     completedDates: ["2026-06-12", "2026-06-13", "2026-06-14"],
     totalCompletions: 3,
     createdAt: "2026-06-08",
@@ -36,7 +36,7 @@ const SEED_TASKS: Task[] = [
     group: "WORK",
     emoji: "🚀",
     isCountable: false,
-    count: 0,
+    dailyCounts: {},
     completedDates: ["2026-06-13", "2026-06-14"],
     totalCompletions: 2,
     createdAt: "2026-06-08",
@@ -50,8 +50,8 @@ const SEED_TASKS: Task[] = [
     group: "EXERCISE",
     emoji: "🎯",
     isCountable: true,
-    count: 0,
     goal: 3,
+    dailyCounts: { "2026-06-11": 2, "2026-06-13": 4 },
     completedDates: ["2026-06-11", "2026-06-13"],
     totalCompletions: 2,
     createdAt: "2026-06-09",
@@ -65,8 +65,9 @@ const SEED_TASKS: Task[] = [
     group: "EXERCISE",
     emoji: "💪",
     isCountable: true,
-    count: 4,
-    goal: 20,
+    goal: 20, // reps per set
+    sets: 3,
+    dailyCounts: { "2026-06-09": 2, "2026-06-10": 3, "2026-06-11": 1, "2026-06-12": 3, "2026-06-13": 4, "2026-06-14": 2 },
     completedDates: ["2026-06-09", "2026-06-10", "2026-06-11", "2026-06-12", "2026-06-13", "2026-06-14"],
     totalCompletions: 6,
     createdAt: "2026-06-09",
@@ -80,8 +81,9 @@ const SEED_TASKS: Task[] = [
     group: "EXERCISE",
     emoji: "🧘",
     isCountable: true,
-    count: 2,
-    goal: 70,
+    goal: 70, // seconds per set
+    sets: 2,
+    dailyCounts: { "2026-06-10": 1, "2026-06-11": 2, "2026-06-12": 2, "2026-06-13": 1, "2026-06-14": 2 },
     completedDates: ["2026-06-10", "2026-06-11", "2026-06-12", "2026-06-13", "2026-06-14"],
     totalCompletions: 5,
     createdAt: "2026-06-10",
@@ -95,8 +97,9 @@ const SEED_TASKS: Task[] = [
     group: "EXERCISE",
     emoji: "🏃",
     isCountable: true,
-    count: 1,
-    goal: 4,
+    goal: 50, // jumps per set
+    sets: 4,
+    dailyCounts: { "2026-06-12": 2, "2026-06-14": 3 },
     reminder: { id: "r6", time: "07:30", label: "Morning exercise!", enabled: true },
     completedDates: ["2026-06-12", "2026-06-14"],
     totalCompletions: 2,
@@ -111,7 +114,7 @@ const SEED_TASKS: Task[] = [
     group: "REMINDER",
     emoji: "📧",
     isCountable: false,
-    count: 0,
+    dailyCounts: {},
     reminder: { id: "r7", time: "09:00", label: "Send the email!", enabled: true },
     completedDates: [],
     totalCompletions: 0,
@@ -124,7 +127,18 @@ export function useTasks() {
   const [tasks, setTasks] = useState<Task[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored) : SEED_TASKS;
+      if (!stored) return SEED_TASKS;
+      const parsed = JSON.parse(stored) as (Task & { count?: number })[];
+      const todayStr = today();
+      // Migrate pre-v2.1 tasks: single `count` -> per-day `dailyCounts`.
+      return parsed.map(t => {
+        if (t.dailyCounts) {
+          const { count: _drop, ...rest } = t;
+          return rest as Task;
+        }
+        const { count = 0, ...rest } = t;
+        return { ...rest, dailyCounts: count ? { [todayStr]: count } : {} } as Task;
+      });
     } catch {
       return SEED_TASKS;
     }
@@ -136,12 +150,13 @@ export function useTasks() {
 
   const todayStr = today();
 
-  function addTask(task: Omit<Task, "id" | "completedDates" | "totalCompletions" | "createdAt" | "color">) {
+  function addTask(task: Omit<Task, "id" | "completedDates" | "totalCompletions" | "createdAt" | "color" | "dailyCounts">) {
     const newTask: Task = {
       ...task,
       id: Date.now().toString(),
       completedDates: [],
       totalCompletions: 0,
+      dailyCounts: {},
       createdAt: todayStr,
       color: COLORS[Math.floor(Math.random() * COLORS.length)],
     };
@@ -185,16 +200,39 @@ export function useTasks() {
   }
 
   function incrementCount(id: string) {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, count: t.count + 1 } : t));
+    setTasks(prev => prev.map(t => {
+      if (t.id !== id) return t;
+      const current = t.dailyCounts[todayStr] ?? 0;
+      return { ...t, dailyCounts: { ...t.dailyCounts, [todayStr]: current + 1 } };
+    }));
   }
 
   function decrementCount(id: string) {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, count: Math.max(0, t.count - 1) } : t));
+    setTasks(prev => prev.map(t => {
+      if (t.id !== id) return t;
+      const next = Math.max(0, (t.dailyCounts[todayStr] ?? 0) - 1);
+      const dailyCounts = { ...t.dailyCounts };
+      if (next === 0) delete dailyCounts[todayStr];
+      else dailyCounts[todayStr] = next;
+      return { ...t, dailyCounts };
+    }));
   }
 
   const groups = Array.from(new Set(tasks.map(t => t.group))).filter(Boolean);
 
   return { tasks, addTask, updateTask, deleteTask, toggleToday, toggleDate, incrementCount, decrementCount, today: todayStr, COLORS, groups };
+}
+
+// Sets (or raw units) logged for a task on a given day.
+export function dailyUnits(task: Task, date: string): number {
+  return task.dailyCounts?.[date] ?? 0;
+}
+
+// The value to chart/display: when `sets` is configured, `goal` is reps per set,
+// so the day's total = units (sets) × reps per set. Otherwise it's the raw units.
+export function dailyTotal(task: Task, date: string): number {
+  const units = dailyUnits(task, date);
+  return task.sets != null && task.goal != null ? units * task.goal : units;
 }
 
 export function buildHistory(tasks: Task[]): DayRecord[] {

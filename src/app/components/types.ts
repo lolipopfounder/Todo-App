@@ -15,8 +15,9 @@ export interface Task {
   group: string;
   emoji: string;
   isCountable: boolean;
-  count: number;
-  goal?: number;
+  goal?: number; // when `sets` is set, this is reps per set; otherwise target count
+  sets?: number; // optional target number of sets (countable tasks)
+  dailyCounts: Record<string, number>; // "YYYY-MM-DD" -> sets (or units) logged that day
   reminder?: Reminder;
   completedDates: string[]; // ISO date strings "YYYY-MM-DD"
   totalCompletions: number;

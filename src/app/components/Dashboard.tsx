@@ -4,6 +4,7 @@ import {
 } from "recharts";
 import { TrendingUp, Award, Zap, Target, ChevronLeft, ChevronRight, CheckCircle2, Circle, X } from "lucide-react";
 import type { Task, DayRecord } from "./types";
+import { dailyTotal } from "./store";
 
 interface Props {
   tasks: Task[];
@@ -283,11 +284,24 @@ function CalendarView({ tasks, today, onToggleDate }: { tasks: Task[]; today: st
 }
 
 export function Dashboard({ tasks, history, today, onToggleDate }: Props) {
+  const [chartTab, setChartTab] = useState<string>("completion");
+  const countableTasks = tasks.filter(t => t.isCountable);
+
+  const dayLabel = (date: string) => {
+    const dt = new Date(date + "T12:00:00");
+    return `${dt.getDate()} ${dt.toLocaleDateString("en-US", { weekday: "short" })}`;
+  };
+
   const last14 = history.slice(-14).map(d => ({
     ...d,
-    dateLabel: new Date(d.date + "T12:00:00").toLocaleDateString("en-US", { month: "numeric", day: "numeric" }),
+    dateLabel: dayLabel(d.date),
     pct: d.total ? Math.round((d.completed / d.total) * 100) : 0,
   }));
+
+  const selectedTask = countableTasks.find(t => t.id === chartTab) ?? null;
+  const taskSeries = selectedTask
+    ? last14.map(d => ({ dateLabel: d.dateLabel, count: dailyTotal(selectedTask, d.date) }))
+    : [];
 
   const currentStreak = streak(tasks, today);
   const avg = avgCompletion(history.slice(-14));
@@ -328,25 +342,64 @@ export function Dashboard({ tasks, history, today, onToggleDate }: Props) {
       {/* Monthly calendar */}
       <CalendarView tasks={tasks} today={today} onToggleDate={onToggleDate} />
 
-      {/* Completion % area chart */}
+      {/* Progress chart with tabs */}
       <div className="rounded-2xl p-4" style={{ background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-        <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "13px", fontWeight: 600, color: "#1c1c1e", marginBottom: "16px" }}>
-          Completion Rate (14 days)
+        <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "13px", fontWeight: 600, color: "#1c1c1e", marginBottom: "12px" }}>
+          {selectedTask ? `${selectedTask.title} (14 days)` : "Completion Rate (14 days)"}
         </p>
-        <ResponsiveContainer width="100%" height={130}>
-          <AreaChart data={last14} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-            <defs>
-              <linearGradient id="pctGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <XAxis dataKey="dateLabel" tick={{ fontFamily: "'Inter', sans-serif", fontSize: 10, fill: "#8e8e93" }} axisLine={false} tickLine={false} />
-            <YAxis domain={[0, 100]} tick={{ fontFamily: "'Inter', sans-serif", fontSize: 10, fill: "#8e8e93" }} axisLine={false} tickLine={false} unit="%" />
-            <Tooltip content={<CustomTooltip />} />
-            <Area type="monotone" dataKey="pct" name="%" stroke="#3b82f6" strokeWidth={2} fill="url(#pctGrad)" dot={false} />
-          </AreaChart>
-        </ResponsiveContainer>
+
+        {/* Tabs */}
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-1" style={{ WebkitOverflowScrolling: "touch" }}>
+          {[{ id: "completion", title: "Completion Rate", color: "#3b82f6", emoji: "" },
+            ...countableTasks.map(t => ({ id: t.id, title: t.title, color: t.color, emoji: t.emoji }))]
+            .map(tab => {
+              const active = chartTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setChartTab(tab.id)}
+                  className="px-3 py-1.5 rounded-lg shrink-0 transition-all"
+                  style={{
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    background: active ? `${tab.color}1a` : "#f2f2f7",
+                    color: active ? tab.color : "#6b7280",
+                    border: active ? `1px solid ${tab.color}` : "1px solid transparent",
+                  }}
+                >
+                  {tab.emoji ? `${tab.emoji} ` : ""}{tab.title}
+                </button>
+              );
+            })}
+        </div>
+
+        {selectedTask ? (
+          <ResponsiveContainer width="100%" height={130}>
+            <BarChart data={taskSeries} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <XAxis dataKey="dateLabel" tick={{ fontFamily: "'Inter', sans-serif", fontSize: 10, fill: "#8e8e93" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontFamily: "'Inter', sans-serif", fontSize: 10, fill: "#8e8e93" }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="count" name={selectedTask.title} radius={[4, 4, 0, 0]} fill={selectedTask.color} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <ResponsiveContainer width="100%" height={130}>
+            <AreaChart data={last14} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="pctGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="dateLabel" tick={{ fontFamily: "'Inter', sans-serif", fontSize: 10, fill: "#8e8e93" }} axisLine={false} tickLine={false} />
+              <YAxis domain={[0, 100]} tick={{ fontFamily: "'Inter', sans-serif", fontSize: 10, fill: "#8e8e93" }} axisLine={false} tickLine={false} unit="%" />
+              <Tooltip content={<CustomTooltip />} />
+              <Area type="monotone" dataKey="pct" name="%" stroke="#3b82f6" strokeWidth={2} fill="url(#pctGrad)" dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
       {/* Tasks completed bar chart */}

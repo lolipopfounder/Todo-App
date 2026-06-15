@@ -1,5 +1,6 @@
 import { CheckCircle2, Circle, Minus, Plus, Pencil } from "lucide-react";
 import type { Task } from "./types";
+import { dailyUnits, dailyTotal } from "./store";
 
 interface Props {
   tasks: Task[];
@@ -103,7 +104,12 @@ interface CardProps {
 
 function TaskCard({ task, today, onToggle, onIncrement, onDecrement, onEdit, onDelete }: CardProps) {
   const done = task.completedDates.includes(today);
-  const reachedGoal = task.isCountable && task.goal !== undefined && task.count >= task.goal;
+  const units = dailyUnits(task, today);
+  const reachedGoal = task.isCountable && (
+    task.sets !== undefined
+      ? units >= task.sets
+      : task.goal !== undefined && units >= task.goal
+  );
   const isComplete = done || reachedGoal;
 
   return (
@@ -150,9 +156,11 @@ function TaskCard({ task, today, onToggle, onIncrement, onDecrement, onEdit, onD
         {/* Goal / count line */}
         {task.isCountable && task.goal !== undefined && (
           <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "12px", color: isComplete ? "#22c55e" : "#8e8e93", marginTop: "2px" }}>
-            {isComplete
-              ? `✓ Done! (${task.count} × ${task.goal / task.count || task.goal})`
-              : `${task.count} / ${task.goal} goal`
+            {task.sets !== undefined
+              ? `${isComplete ? "✓ " : ""}${units} / ${task.sets} sets · ${dailyTotal(task, today)} reps`
+              : isComplete
+                ? `✓ Done! (${units} / ${task.goal})`
+                : `${units} / ${task.goal} goal`
             }
           </p>
         )}
@@ -191,7 +199,7 @@ function TaskCard({ task, today, onToggle, onIncrement, onDecrement, onEdit, onD
               className="w-7 text-center"
               style={{ fontFamily: "'Inter', sans-serif", fontSize: "16px", fontWeight: 600, color: "#1c1c1e" }}
             >
-              {task.count}
+              {units}
             </span>
             <button
               onClick={() => onIncrement(task.id)}
